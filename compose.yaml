@@ -1,0 +1,26 @@
+services:
+  radio:
+    build: .
+    image: radio-stream:base
+    restart: unless-stopped
+    init: true
+    shm_size: 256m
+    ports:
+      - "127.0.0.1:5900:5900"
+    volumes:
+      - ./config:/config:ro
+      - ./app:/app:ro
+      - ./recordings:/recordings
+      - ./state:/state
+    environment:
+      RX_FREQ_KHZ: "14074"
+      RX_MODE: usb
+      RX_BANDWIDTH_HZ: "3000"
+      RECEIVERS_FILE: /config/receivers.json
+      VNC_PASSWORD_FILE: /config/vnc.pass
+      APP_COMMAND: "xterm -geometry 100x30"
+      YT_STREAM_KEY: ${YT_STREAM_KEY:-}
+      STREAM_OUTPUT: ${STREAM_OUTPUT:-}
+      WIDTH: "1280"
+      HEIGHT: "720"
+      FPS: "15"

@@ -1,0 +1,9 @@
+[
+  {
+    "name": "Northern Utah KiwiSDR 1 (omnidirectional; site may redirect)",
+    "min_khz": 1,
+    "max_khz": 30000,
+    "host": "kiwisdr1.sdrutah.org",
+    "port": 8073
+  }
+]

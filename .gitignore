@@ -1,0 +1,7 @@
+.env
+config/vnc.pass
+config/vnc-password.txt
+recordings/
+state/
+__pycache__/
+*.pyc
