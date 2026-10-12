@@ -2,6 +2,7 @@
 !Dockerfile
 !radio.py
 !session.py
+!tuning_status.py
 !tools/
 !tools/websdr/
 !tools/websdr/package.json

@@ -11,7 +11,6 @@ services:
       - ./config:/config:ro
       - ./app:/app:ro
       - ./recordings:/recordings
-      - ./state:/state
     environment:
       RX_FREQ_KHZ: "14074"
       RX_MODE: usb

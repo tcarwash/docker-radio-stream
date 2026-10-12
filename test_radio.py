@@ -47,9 +47,17 @@ class RadioTests(unittest.TestCase):
             with self.subTest(frequency=frequency):
                 cfg = radio.configure(dict(self.env, RECEIVERS_FILE=str(mapping), RX_FREQ_KHZ=frequency))
                 self.assertEqual(cfg.receiver.get('type'), 'websdr')
+                self.assertFalse(cfg.receiver.get('mode_inverted', False))
                 self.assertEqual(cfg.receiver['url'], f'http://websdr{server}.sdrutah.org:890{server}/index1a.html')
         with self.assertRaisesRegex(ValueError, 'No configured receiver'):
             radio.configure(dict(self.env, RECEIVERS_FILE=str(mapping), RX_FREQ_KHZ='9000'))
+
+    def test_websdr_mode_inverted_must_be_boolean(self):
+        self.mapping.write_text(json.dumps([{'name': 'fixture', 'min_khz': 14000,
+            'max_khz': 14350, 'type': 'websdr', 'url': 'http://localhost:8901/index.html',
+            'mode_inverted': 'true'}]))
+        with self.assertRaisesRegex(ValueError, 'mode_inverted must be a boolean'):
+            radio.configure(self.env)
 
     def test_frequency_boundary_chooses_first_match(self):
         self.env['RX_FREQ_KHZ'] = '8000'

@@ -41,9 +41,12 @@ RUN cd /opt/radio/websdr && npm install --ignore-scripts --omit=dev \
     && npx playwright install --with-deps chromium \
     && chmod -R a+rX /opt/playwright && rm -rf /var/lib/apt/lists/*
 COPY tools/websdr/websdr_bridge.js tools/websdr/LICENSE /opt/radio/websdr/
+RUN apt-get update && apt-get install -y --no-install-recommends libhamlib-utils python3-tk \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY radio.py /opt/radio/radio.py
 COPY session.py /opt/radio/session.py
+COPY tuning_status.py /opt/radio/tuning_status.py
 USER radio
 WORKDIR /opt/radio
 EXPOSE 5900

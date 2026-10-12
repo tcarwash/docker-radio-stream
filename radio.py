@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from tuning_status import DEFAULT_STATUS_PATH, write_status
+
 
 @dataclass
 class Config:
@@ -90,6 +92,8 @@ def configure(env):
                     raise ValueError('invalid WebSDR URL')
                 if url.port is not None:
                     _positive_int(url.port, 'port', 65535)
+                if 'mode_inverted' in receiver and not isinstance(receiver['mode_inverted'], bool):
+                    raise ValueError('mode_inverted must be a boolean')
             elif kind == 'kiwi':
                 host = receiver['host']
                 if not isinstance(host, str) or not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9.\-]{0,252}', host):
@@ -169,6 +173,13 @@ def main():
     soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
     resource.setrlimit(resource.RLIMIT_NOFILE, (min(soft, 8192), hard))
     cfg = configure(os.environ)
+    write_status({
+        'state': 'configured',
+        'frequency_khz': cfg.frequency,
+        'mode': cfg.mode,
+        'passband_hz': cfg.passband,
+        'receiver': cfg.receiver['name'],
+    }, os.environ.get('TUNING_STATUS_FILE', DEFAULT_STATUS_PATH))
     print(f"Selected {cfg.receiver['name']} at {cfg.frequency:g} kHz ({cfg.mode}, {cfg.passband} Hz)", flush=True)
     os.environ['DISPLAY'] = ':99'
     os.environ['PULSE_SINK'] = 'rx_audio'
@@ -189,6 +200,7 @@ def main():
         wait_ready(['pactl', 'info'], processes['pulse'], 'PulseAudio')
         setup_audio()
         processes['wm'] = spawn(['openbox'])
+        processes['status'] = spawn(['python3', '/opt/radio/tuning_status.py'])
         password_file = os.environ.get('VNC_PASSWORD_FILE', '/config/vnc.pass')
         if not Path(password_file).is_file():
             raise ValueError(f'VNC password file missing: {password_file} (create with x11vnc -storepasswd)')
@@ -197,10 +209,10 @@ def main():
         print('VNC available on :5900; publish to host loopback only', flush=True)
 
         processes['app'] = spawn(cfg.app_command)
-        print('Desktop ready. Start a bounded session with docker compose exec.', flush=True)
+        print('Desktop ready. Start a duration-selected session with docker compose exec.', flush=True)
         while not stopping:
             time.sleep(2)
-            for name in ('x', 'pulse', 'wm', 'vnc'):
+            for name in ('x', 'pulse', 'wm', 'status', 'vnc'):
                 if processes[name].poll() is not None:
                     raise RuntimeError(f'{name} exited')
             if processes['app'].poll() is not None:
