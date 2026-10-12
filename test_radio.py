@@ -20,18 +20,36 @@ class RadioTests(unittest.TestCase):
         self.env = {'RX_FREQ_KHZ': '14074', 'RX_MODE': 'usb', 'RX_BANDWIDTH_HZ': '3000',
                     'RECEIVERS_FILE': str(self.mapping)}
 
+    def test_websdr_url_map_and_tuning_command(self):
+        self.mapping.write_text(json.dumps([{'name': 'fixture', 'min_khz': 14000,
+            'max_khz': 14350, 'type': 'websdr', 'url': 'http://localhost:8901/index.html'}]))
+        cfg = radio.configure(self.env)
+        self.assertEqual(cfg.websdr_command(), ['node', '/opt/radio/websdr/websdr_bridge.js',
+            'http://localhost:8901/index.html', '14074', 'usb', '0', '3000'])
+
+    def test_audio_setup_publishes_remapped_monitor_as_default_input(self):
+        with patch.dict(os.environ, {}, clear=True), patch('radio.subprocess.run') as run:
+            radio.setup_audio()
+            self.assertEqual(os.environ['PULSE_SOURCE'], 'rx_audio_input')
+
+        commands = [call.args[0] for call in run.call_args_list]
+        self.assertIn(['pactl', 'set-default-source', 'rx_audio_input'], commands)
+        self.assertIn('source_name=rx_audio_input', sum(commands, []))
+
     def test_selects_receiver_and_passband(self):
         cfg = radio.configure(self.env)
         self.assertEqual(cfg.receiver['host'], 'high.example')
         self.assertEqual(cfg.receiver_command()[-10:], ['-f', '14074', '-m', 'usb', '-L', '0', '-H', '3000', '--nc', '--nc-wav'])
 
-    def test_public_utah_frequency_map_selects_omni_kiwi(self):
+    def test_public_utah_frequency_map_selects_websdr(self):
         mapping = Path(__file__).parent / 'config' / 'receivers.json'
-        for frequency in ('1800', '7040', '14074', '28074'):
+        for frequency, server in [('1800', 1), ('7074', 1), ('14074', 2), ('28074', 2)]:
             with self.subTest(frequency=frequency):
                 cfg = radio.configure(dict(self.env, RECEIVERS_FILE=str(mapping), RX_FREQ_KHZ=frequency))
-                self.assertEqual(cfg.receiver['host'], 'kiwisdr1.sdrutah.org')
-                self.assertEqual(cfg.receiver['port'], 8073)
+                self.assertEqual(cfg.receiver.get('type'), 'websdr')
+                self.assertEqual(cfg.receiver['url'], f'http://websdr{server}.sdrutah.org:890{server}/index1a.html')
+        with self.assertRaisesRegex(ValueError, 'No configured receiver'):
+            radio.configure(dict(self.env, RECEIVERS_FILE=str(mapping), RX_FREQ_KHZ='9000'))
 
     def test_frequency_boundary_chooses_first_match(self):
         self.env['RX_FREQ_KHZ'] = '8000'
@@ -69,6 +87,7 @@ class RadioTests(unittest.TestCase):
         command = radio.configure(self.env).stream_command()
         self.assertIn('x11grab', command)
         self.assertIn('rx_audio.monitor', command)
+        self.assertEqual(command[command.index('-tune') + 1], 'zerolatency')
         self.assertEqual(command[-1], self.env['STREAM_OUTPUT'])
 
     def test_app_command_is_argv_not_shell(self):

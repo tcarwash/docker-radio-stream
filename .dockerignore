@@ -1,0 +1,9 @@
+**
+!Dockerfile
+!radio.py
+!session.py
+!tools/
+!tools/websdr/
+!tools/websdr/package.json
+!tools/websdr/websdr_bridge.js
+!tools/websdr/LICENSE

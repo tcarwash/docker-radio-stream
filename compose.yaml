@@ -1,7 +1,7 @@
 services:
   radio:
     build: .
-    image: radio-stream:base
+    image: ghcr.io/tcarwash/radio-stream:base
     restart: unless-stopped
     init: true
     shm_size: 256m
@@ -18,7 +18,7 @@ services:
       RX_BANDWIDTH_HZ: "3000"
       RECEIVERS_FILE: /config/receivers.json
       VNC_PASSWORD_FILE: /config/vnc.pass
-      APP_COMMAND: "xterm -geometry 100x30"
+      APP_COMMAND: "${APP_COMMAND:-xterm -geometry 100x30}"
       YT_STREAM_KEY: ${YT_STREAM_KEY:-}
       STREAM_OUTPUT: ${STREAM_OUTPUT:-}
       WIDTH: "1280"

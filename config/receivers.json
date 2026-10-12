@@ -1,9 +1,12 @@
 [
-  {
-    "name": "Northern Utah KiwiSDR 1 (omnidirectional; site may redirect)",
-    "min_khz": 1,
-    "max_khz": 30000,
-    "host": "kiwisdr1.sdrutah.org",
-    "port": 8073
-  }
+  {"name":"Northern Utah WebSDR 1 - 160m","type":"websdr","min_khz":1800,"max_khz":2000,"url":"http://websdr1.sdrutah.org:8901/index1a.html"},
+  {"name":"Northern Utah WebSDR 1 - 80m","type":"websdr","min_khz":3500,"max_khz":4000,"url":"http://websdr1.sdrutah.org:8901/index1a.html"},
+  {"name":"Northern Utah WebSDR 1 - 60m","type":"websdr","min_khz":5330.5,"max_khz":5406.5,"url":"http://websdr1.sdrutah.org:8901/index1a.html"},
+  {"name":"Northern Utah WebSDR 1 - 40m","type":"websdr","min_khz":7000,"max_khz":7300,"url":"http://websdr1.sdrutah.org:8901/index1a.html"},
+  {"name":"Northern Utah WebSDR 2 - 30m","type":"websdr","min_khz":10100,"max_khz":10150,"url":"http://websdr2.sdrutah.org:8902/index1a.html"},
+  {"name":"Northern Utah WebSDR 2 - 20m","type":"websdr","min_khz":14000,"max_khz":14350,"url":"http://websdr2.sdrutah.org:8902/index1a.html"},
+  {"name":"Northern Utah WebSDR 2 - 17m","type":"websdr","min_khz":18068,"max_khz":18168,"url":"http://websdr2.sdrutah.org:8902/index1a.html"},
+  {"name":"Northern Utah WebSDR 2 - 15m","type":"websdr","min_khz":21000,"max_khz":21450,"url":"http://websdr2.sdrutah.org:8902/index1a.html"},
+  {"name":"Northern Utah WebSDR 2 - 12m","type":"websdr","min_khz":24890,"max_khz":24990,"url":"http://websdr2.sdrutah.org:8902/index1a.html"},
+  {"name":"Northern Utah WebSDR 2 - 10m","type":"websdr","min_khz":28000,"max_khz":29700,"url":"http://websdr2.sdrutah.org:8902/index1a.html"}
 ]

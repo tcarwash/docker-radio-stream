@@ -1,4 +1,4 @@
-"""KiwiSDR audio -> virtual sound card -> desktop application -> video stream."""
+"""Receiver audio -> virtual sound card -> desktop application -> video stream."""
 import json
 import os
 import re
@@ -10,6 +10,7 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlsplit
 
 
 @dataclass
@@ -23,6 +24,12 @@ class Config:
     width: int
     height: int
     fps: int
+
+    def websdr_command(self):
+        if self.receiver.get('type') != 'websdr':
+            raise ValueError('Default sessions require a WebSDR URL map; use --audio-source kiwi for legacy maps')
+        return ['node', '/opt/radio/websdr/websdr_bridge.js', self.receiver['url'],
+                f'{self.frequency:g}', self.mode, *map(str, self.passband)]
 
     def receiver_command(self):
         low, high = self.passband
@@ -39,7 +46,7 @@ class Config:
                 f'{self.width}x{self.height}', '-i', ':99.0',
                 '-f', 'pulse', '-i', 'rx_audio.monitor',
                 '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'libx264',
-                '-preset', 'veryfast', '-pix_fmt', 'yuv420p',
+                '-preset', 'veryfast', '-tune', 'zerolatency', '-pix_fmt', 'yuv420p',
                 '-b:v', '2500k', '-maxrate', '2500k', '-bufsize', '5000k',
                 '-g', str(self.fps * 2), '-c:a', 'aac', '-b:a', '128k',
                 '-ar', '48000', '-ac', '1', '-f', 'flv', self.stream_output]
@@ -76,10 +83,20 @@ def configure(env):
         raise ValueError('Receiver map must be a nonempty JSON array')
     for receiver in receivers:
         try:
-            host = receiver['host']
-            if not isinstance(host, str) or not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9.\-]{0,252}', host):
-                raise ValueError('invalid host')
-            port = _positive_int(receiver['port'], 'port', 65535)
+            kind = receiver.get('type', 'kiwi')
+            if kind == 'websdr':
+                url = urlsplit(receiver['url'])
+                if url.scheme not in ('http', 'https') or not url.hostname or url.username or url.password:
+                    raise ValueError('invalid WebSDR URL')
+                if url.port is not None:
+                    _positive_int(url.port, 'port', 65535)
+            elif kind == 'kiwi':
+                host = receiver['host']
+                if not isinstance(host, str) or not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9.\-]{0,252}', host):
+                    raise ValueError('invalid host')
+                _positive_int(receiver['port'], 'port', 65535)
+            else:
+                raise ValueError('unknown receiver type')
             lower, upper = float(receiver['min_khz']), float(receiver['max_khz'])
             if not 0 <= lower < upper <= 30000:
                 raise ValueError('invalid frequency range')
@@ -89,7 +106,7 @@ def configure(env):
             raise ValueError(f'Invalid receiver entry: {exc}') from exc
     selected = next((r for r in receivers if r['min_khz'] <= frequency <= r['max_khz']), None)
     if selected is None:
-        raise ValueError(f'No configured KiwiSDR covers {frequency:g} kHz')
+        raise ValueError(f'No configured receiver covers {frequency:g} kHz')
     app_command = shlex.split(env.get('APP_COMMAND', 'xterm -geometry 100x30'))
     if not app_command:
         raise ValueError('APP_COMMAND cannot be empty')
@@ -133,6 +150,19 @@ def wait_ready(command, process, name):
     raise RuntimeError(f'{name} did not become ready')
 
 
+def setup_audio():
+    subprocess.run(['pactl', 'load-module', 'module-null-sink', 'sink_name=rx_audio',
+                    'rate=48000', 'channels=1'], check=True, stdout=subprocess.DEVNULL)
+    subprocess.run(['pactl', 'load-module', 'module-remap-source',
+                    'source_name=rx_audio_input', 'master=rx_audio.monitor',
+                    'channels=1', 'source_properties=device.description=Radio-Loopback'],
+                   check=True, stdout=subprocess.DEVNULL)
+    subprocess.run(['pactl', 'set-default-sink', 'rx_audio'], check=True)
+    subprocess.run(['pactl', 'set-default-source', 'rx_audio_input'], check=True)
+    os.environ['PULSE_SINK'] = 'rx_audio'
+    os.environ['PULSE_SOURCE'] = 'rx_audio_input'
+
+
 def main():
     # x11vnc's select loop can spin indefinitely with Docker's enormous
     # RLIMIT_NOFILE (observed: 2147483584), delaying VNC handshakes.
@@ -142,7 +172,6 @@ def main():
     print(f"Selected {cfg.receiver['name']} at {cfg.frequency:g} kHz ({cfg.mode}, {cfg.passband} Hz)", flush=True)
     os.environ['DISPLAY'] = ':99'
     os.environ['PULSE_SINK'] = 'rx_audio'
-    os.environ['PULSE_SOURCE'] = 'rx_audio.monitor'
     os.environ['PULSE_SERVER'] = 'unix:/run/radio/pulse/native'
     processes = {}
     stopping = False
@@ -158,10 +187,7 @@ def main():
         wait_ready(['xdpyinfo', '-display', ':99'], processes['x'], 'Xvfb')
         processes['pulse'] = spawn(['pulseaudio', '--daemonize=no', '--exit-idle-time=-1', '--log-target=stderr'])
         wait_ready(['pactl', 'info'], processes['pulse'], 'PulseAudio')
-        subprocess.run(['pactl', 'load-module', 'module-null-sink', 'sink_name=rx_audio',
-                        'rate=48000', 'channels=1'], check=True, stdout=subprocess.DEVNULL)
-        subprocess.run(['pactl', 'set-default-sink', 'rx_audio'], check=True)
-        subprocess.run(['pactl', 'set-default-source', 'rx_audio.monitor'], check=True)
+        setup_audio()
         processes['wm'] = spawn(['openbox'])
         password_file = os.environ.get('VNC_PASSWORD_FILE', '/config/vnc.pass')
         if not Path(password_file).is_file():
